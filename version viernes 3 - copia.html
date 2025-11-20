@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>La gran línea del arte — Jeopardy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Google Font: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tailwind config: paleta CMY
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { inter: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            cyanC:    '#22d3ee',  // cian
+            magentaM: '#e879f9',  // magenta
+            yellowY:  '#facc15',  // amarillo
+            boardBg:  '#0b1020',
+          },
+          boxShadow: { soft: '0 10px 30px rgba(0,0,0,.25)' }
+        }
+      }
+    }
+  </script>
+  <style>
+    html, body { height: 100%; }
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background:#0b1020; }
+    .thin-scroll::-webkit-scrollbar{width:10px;height:10px}
+    .thin-scroll::-webkit-scrollbar-thumb{background:#334155;border-radius:8px}
+    .thin-scroll::-webkit-scrollbar-track{background:transparent}
+    .played { filter: grayscale(1) brightness(.7); pointer-events: none; }
+    .pulse-ring { position:absolute; inset:-4px; border-radius:16px; border:2px solid #22d3ee; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%{opacity:1; transform:scale(1)} 100%{opacity:0; transform:scale(1.15)} }
+
+    /* Evita artefactos de dibujo/solapes en Chrome */
+    #teams, #teams * { transform: translateZ(0); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100">
+  <!-- Encabezado -->
+  <header class="sticky top-0 z-30 bg-boardBg/80 backdrop-blur border-b border-white/10">
+    <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center gap-3">
+      <h1 class="text-xl md:text-2xl font-extrabold tracking-tight">La gran línea del arte</h1>
+      <span class="ml-3 text-xs md:text-sm px-2 py-1 rounded-full bg-cyanC/10 text-cyanC border border-cyanC/30">
+        Juego tipo Jeopardy • Control docente
+      </span>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="toggleInstructionsBtn" class="px-3 py-1.5 rounded-lg text-sm border border-white/10 hover:border-white/20 hover:bg-white/5 transition">Instrucciones</button>
+        <button id="newGameBtn" class="px-3 py-1.5 rounded-lg text-sm bg-yellowY/90 hover:bg-yellowY text-slate-900 font-semibold shadow-soft transition">Reiniciar partida</button>
+        <label class="flex items-center gap-2 text-sm opacity-90 select-none">
+          <input id="soundToggle" type="checkbox" class="w-4 h-4 rounded" checked>
+          Sonido
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <!-- Layout -->
+  <main class="max-w-[1400px] mx-auto px-4 md:px-6 py-4 md:py-6 grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
+
+    <!-- Tablero -->
+    <section aria-label="Tablero">
+      <div id="board" class="grid grid-cols-5 gap-2 md:gap-3">
+        <!-- lo genera JS -->
+      </div>
+    </section>
+
+    <!-- Marcador grande (debajo del tablero) -->
+    <section aria-label="Marcador grande" class="mt-6">
+      <div class="flex items-center gap-3 mb-3">
+        <h2 class="text-lg font-bold">Marcador</h2>
+        <span class="text-xs opacity-70">Vista amplia para proyección</span>
+        <button id="showFinalResultsBtn"
+                class="ml-auto px-3 py-1.5 rounded-lg bg-yellowY/90 hover:bg-yellowY text-slate-900 font-semibold">
+          Mostrar resultados finales
+        </button>
+      </div>
+      <div id="scoreboardGrid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+        <!-- lo llena JS -->
+      </div>
+    </section>
+
+    <!-- Panel docente -->
+    <aside aria-label="Panel docente" class="space-y-6">
+      <!-- Temporizador -->
+      <div class="relative rounded-2xl border border-white/10 bg-white/[.04] p-4 md:p-5 shadow-soft">
+        <div class="absolute -inset-[1px] rounded-2xl pointer-events-none" style="background: radial-gradient(1200px 300px at 10% -10%, rgba(34,211,238,.15), transparent 40%), radial-gradient(800px 250px at 100% -10%, rgba(232,121,249,.15), transparent 40%);"></div>
+        <h2 class="font-bold text-lg mb-3">Temporizador</h2>
+        <div class="flex items-center gap-3">
+          <div id="timerDisplay" class="text-5xl md:text-6xl font-extrabold tabular-nums tracking-tight text-cyanC">30</div>
+          <div class="ml-auto flex flex-wrap gap-2">
+            <button id="timerStart" class="px-3 py-1.5 bg-cyanC/90 hover:bg-cyanC text-slate-900 font-semibold rounded-lg">Iniciar</button>
+            <button id="timerPause" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg">Pausar</button>
+            <button id="timerReset" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg">Reiniciar</button>
+            <select id="timerPreset" class="px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10">
+              <option value="30">30 s</option>
+              <option value="45">45 s</option>
+              <option value="60">60 s</option>
+              <option value="90">90 s</option>
+            </select>
+          </div>
+        </div>
+        <p class="mt-2 text-xs opacity-80">Control manual por el docente. Al finalizar: alerta visual y sonora.</p>
+      </div>
+
+      <!-- Controles de pregunta -->
+      <div class="rounded-2xl border border-white/10 bg-white/[.04] p-4 md:p-5 shadow-soft">
+        <h2 class="font-bold text-lg mb-3">Controles de pregunta</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btnShowPrompt" class="col-span-2 px-3 py-2 rounded-xl bg-magentaM/90 hover:bg-magentaM text-slate-900 font-semibold">Mostrar pregunta</button>
+          <button id="btnShowAnswer" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Mostrar respuesta</button>
+          <button id="btnBackToBoard" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Volver al tablero</button>
+          <button id="btnMarkPlayed" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Marcar como jugada</button>
+        </div>
+        <p id="currentCellInfo" class="mt-3 text-xs opacity-80">Seleccione una celda del tablero para preparar la pregunta.</p>
+
+        <!-- Toggle: volver automáticamente al tablero al marcar jugada -->
+        <div class="mt-3 flex items-center gap-2 text-sm">
+          <input id="autoBackToggle" type="checkbox" class="w-4 h-4 rounded" checked>
+          <label for="autoBackToggle" class="select-none">
+            Volver al tablero automáticamente al marcar como jugada
+          </label>
+        </div>
+      </div>
+
+      <!-- Marcador manual -->
+      <div class="rounded-2xl border border-white/10 bg-white/[.04] p-4 md:p-5 shadow-soft">
+        <h2 class="font-bold text-lg mb-3">Marcador manual (8 equipos)</h2>
+        <div id="teams" class="grid grid-cols-1 sm:grid-cols-2 gap-5 isolate">
+          <!-- tarjetas generadas por JS -->
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <button id="resetScores" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Poner marcadores en 0</button>
+          <span class="text-xs opacity-70">Use +/− según la evaluación del docente.</span>
+        </div>
+      </div>
+
+      <!-- Historial -->
+      <div class="rounded-2xl border border-white/10 bg-white/[.04] p-4 md:p-5 shadow-soft">
+        <h2 class="font-bold text-lg mb-3">Historial de puntuaciones por ronda</h2>
+        <div id="history" class="thin-scroll max-h-64 overflow-y-auto space-y-2 text-sm"></div>
+        <div class="mt-3">
+          <button id="clearHistory" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Limpiar historial</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Overlay -->
+  <section id="overlay" class="fixed inset-0 z-40 hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+    <div class="relative z-10 max-w-[1400px] mx-auto h-full flex flex-col p-4 md:p-6">
+      <div class="flex items-center gap-4">
+        <div class="px-3 py-1 rounded-lg border border-white/10 text-xs opacity-80" id="overlayMeta">Categoría • 100 puntos</div>
+        <div class="ml-auto flex items-center gap-2">
+          <button id="overlayShowAnswer" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Mostrar respuesta</button>
+          <button id="overlayBack" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Volver al tablero</button>
+        </div>
+      </div>
+      <div class="relative mt-4 md:mt-6 bg-white/[.03] border border-white/10 rounded-2xl flex-1 overflow-hidden">
+        <div id="overlayContent" class="w-full h-full p-4 md:p-8 overflow-auto"></div>
+        <div id="overlayTimerBadge" class="absolute top-3 right-3 text-3xl md:text-4xl font-extrabold tabular-nums text-cyanC drop-shadow"></div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <button id="overlayShowPrompt" class="col-span-2 px-3 py-2 rounded-xl bg-magentaM/90 hover:bg-magentaM text-slate-900 font-semibold">Mostrar pregunta</button>
+        <button id="overlayMarkPlayed" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Marcar como jugada</button>
+        <button id="overlayFocusTimer" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20">Enfocar temporizador</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Instrucciones -->
+  <section id="instructions" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/70"></div>
+    <div class="relative z-10 max-w-3xl mx-auto mt-10 mb-6 bg-slate-900 border border-white/10 rounded-2xl p-6 md:p-8 shadow-soft">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-yellowY/20 flex items-center justify-center">🎮</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-extrabold">Instrucciones para el docente</h3>
+          <ul class="mt-3 space-y-2 text-sm leading-relaxed">
+            <li>1) Proyecte el tablero. Haga clic en una celda para seleccionarla.</li>
+            <li>2) Use <span class="px-1 rounded bg-white/10">Mostrar pregunta</span> / <span class="px-1 rounded bg-white/10">Mostrar respuesta</span>.</li>
+            <li>3) Controle el <strong>temporizador</strong> (Iniciar/Pausar/Reiniciar y 30/45/60/90 s). Al finalizar, alerta visual y sonora.</li>
+            <li>4) Ajuste puntos con <strong>+/−</strong> en el marcador. El historial registra cada cambio.</li>
+            <li>5) Marque preguntas jugadas para bloquear su celda (puede activar retorno automático al tablero).</li>
+            <li>6) <strong>Reiniciar partida</strong> limpia tablero, marcadores e historial.</li>
+            <li>Para poner imágenes: edite <code>GAME_DATA</code> y complete <code>media</code> con <code>&lt;img src="URL"&gt;</code>.</li>
+          </ul>
+        </div>
+        <button id="closeInstructions" class="ml-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Cerrar</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+  // ============================
+  //   DATOS DEL JUEGO (7 niveles)
+  // ============================
+  // Para agregar una imagen: ponga un <img> en "media". Ejemplo:
+  // media: '<img class="max-h-[55vh] mx-auto rounded-xl" src="https://upload.wikimedia.org/...jpg" alt="Obra">'
+  // Si no usa imagen, deje media: ''.
+  const GAME_DATA = [
+    {
+      name: "Forma y estilo",
+      questions: [
+        { value:100, prompt:"¿Qué técnica se usó para crear esta pintura?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://www.pliegosuelto.com/wp-content/uploads/2013/04/jrhorses.jpg" alt="Caballos de la cueva">', answer:"Pigmentos naturales aplicados con soplido."},
+        { value:200, prompt:"¿Qué rasgo hace que esta figura sea egipcia?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/TombofNebamun-2.jpg/250px-TombofNebamun-2.jpg" alt="Tumba de Nebamun">', answer:"Ley de Frontalidad y tamaños jerárquicos"},
+        { value:300, prompt:"¿Qué estrategia de dibujo se usó para lograr profundidad?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://i0.wp.com/www.pourquoi-pas-nous.com/wp-content/uploads/2021/11/painting-gafc584027_1920-scaled-jpg-webp-webp.webp?fit=800%2C407&ssl=1" alt="Perspectiva en pintura">', answer:"Perspectiva lineal con punto de fuga."},
+        { value:400, prompt:"¿Qué recurso de luz destaca en esta escena?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSB9QTfwkBN8SnWNEIdfHU1puHya6NthjeQSA&s" alt="Claroscuro">', answer:"Claroscuro."},
+        { value:500, prompt:"¿Qué caracteriza la técnica impresionista?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://amuraworld.com/images/2020/01-sept/monet/monet-paint.jpg" alt="Impresionismo">', answer:"Pinceladas sueltas (manchas de color) y colores puros, sin usar negro."},
+        { value:600, prompt:"¿Qué caracterìsticas distinguen a esta obra abstracta?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcROOVTz4wPIf7_n-oYTGTQRZpy9vGutUqXgxA&s" alt="Abstracción">', answer:"Uso de formas geométricas y color expresivo de color."},
+        { value:700, prompt:"¿Qué rasgos del estilo romántico se observan en esta pintura?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSDmE1BbMtKLE3Vhb02OG4yNXYQega-mP0Omg&s" alt="Romanticismo">', answer:"Composición diagonal, gestos intensos, contraste fuerte de luz y sombra, dramatismo emocional."}
+      ]
+    },
+    {
+      name: "¿A qué periodo pertenece?",
+      questions: [
+        { value:100, prompt:"Observá la imagen. ¿De qué periodo histórico es esta pintura?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://www.worldhistory.org/img/c/p/360x202/3537.jpg?v=1751843828" alt="Pintura rupestre">', answer:"Pintura rupestre (Cueva de Lascaux) - Prehistoria"},
+        { value:200, prompt:"Por la forma de las figuras y el orden, ¿a qué época pertenece?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Nebamun_tomb_fresco_dancers_and_musicians.png/500px-Nebamun_tomb_fresco_dancers_and_musicians.png" alt="Nebamun">', answer:"Mural con figuras jerárquicas (Tumba de Nebamun) - Egipto Antiguo"},
+        { value:300, prompt:"¿A qué periodo pertenece esta obra por su proporción y armonía?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4OJ_ByG11XK4kN6D46Zv0fRFKlda0o3VZvg&s" alt="Clásico">', answer:"Escultura de mármol con equilibrio y naturalismo (Discóbolo o Venus de Milo) - Mundo Clásico (Grecia)"},
+        { value:400, prompt:"¿De qué época creés que es este tipo de representación?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://m.arteguias.com/imagenes2/mosaicosromanos3.jpg" alt="Mosaico romano">', answer:"Mosaico colorido con figuras humanas y animales (villa romana) - Época Romana"},
+        { value:500, prompt:"Por su composición, ¿a qué etapa del arte corresponde?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://i.pinimg.com/474x/94/aa/f2/94aaf210619483d11af9752f74d1f694.jpg" alt="Vermeer">', answer:"La muchacha de la perla - Renacimiento."},
+        { value:600, prompt:"¿A qué periodo pertenece por su intensidad y movimiento?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://www.meisterdrucke.es/kunstwerke/kunstler_thumbs/Caspar-David-Friedrich.jpg" alt="Romanticismo">', answer:"El caminante sobre el mar de niebla - Caspar David Friedrich - Romanticismo (siglo XIX)"},
+        { value:700, prompt:"Por su forma y propuesta, ¿a qué etapa del arte pertenece?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://cdn.prod.website-files.com/65a1b21a5fcbab501a6f2d5c/67507880165ce79084d717d3_67503c3e7e7984f1bc38130d_b6901679113381.5cb8c92f0e602.jpeg" alt="Puertas de Christo y Jeanne Claude">', answer:"Puertas de Christo y Jeanne Claude (2005) - Posmodernidad / Arte Contemporáneo"}
+      ]
+    },
+    {
+      name: "El mundo que refleja",
+      questions: [
+        { value:100, prompt:"¿Qué aspectos de la vida cotidiana muestra esta obra?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT2aHtpKkEvO5dmhiPb0z8wgtrVw2l7NVH-KQ&s" alt="Vid cosecha">', answer:"Escenas de trabajo y ocio. Recolección de la vid"},
+        { value:200, prompt:"¿Qué aspectos de la cultura egipcia representan las pirámides de Giza?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://content-historia.nationalgeographic.com.es/medio/2024/09/03/shutterstock-2267726773_3a948c25_240903101038_1280x855.jpg" alt="Pirámides de Giza">', answer:"Monumentalidad - Inmortalidad del Faraón - Vida después de la muerte"},
+        { value:300, prompt:"¿Qué expresa la catedral gótica sobre la sociedad?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://upload.wikimedia.org/wikipedia/commons/c/c6/Chartres-Cathedral.jpg" alt="Catedral de Chartres">', answer:"Catedral de Chartres - Centralidad de la religión y fe colectiva"},
+        { value:400, prompt:"¿Qué idea del hombre muestra el Renacimiento?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://cdn.culturagenial.com/es/imagenes/la-escuela-de-atenas-de-rafael-sanzio-og.jpg?class=ogImageWide" alt="Escuela de Atenas">', answer:"La Escuela de Atenas, Rafael - Centralidad en la Razón humana y conocimiento como virtudes."},
+        { value:500, prompt:"¿Qué muestra el cuadro de Renoir sobre su época?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKf3f7G9XSwTtHxY3D0N-Dr_bZUSRjJ-7EFw&s" alt="Moulin de la Galette">', answer:"Vida moderna y burguesa, ocio urbano. - Moulin de la Galette"},
+        { value:600, prompt:"¿Qué hecho histórico refleja esta obra?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTtXvha0N0Xd4IX-RXkmK-rOcsgYh_xWDjvtw&s" alt="Guernica">', answer:"Bombardeo de Guernica. Primer bombardeo a una población civil - Guernica, Picasso"},
+        { value:700, prompt:"¿Qué refleja la instalación de Kusama sobre la época actual?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://mymodernmet.com/wp/wp-content/uploads/2017/07/yayoi-kusama-mirror-room-8.jpg" alt="Kusama">', answer:"Cultura visual, inmersiva y repetición - Infinity Mirror Room"}
+      ]
+    },
+    {
+      name: "Sensaciones y significados",
+      questions: [
+        { value:100, prompt:"¿Qué transmite esta mano pintada?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/SantaCruz-CuevaManos-P2210651b.jpg/1200px-SantaCruz-CuevaManos-P2210651b.jpg" alt="Cueva de las Manos">', answer:"Cueva de las Manos - Identidad y presencia humana."},
+        { value:200, prompt:"¿Qué emoción provoca esta escena?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://historiadelartebachillerato.wordpress.com/wp-content/uploads/2012/01/imagen1.png" alt="Autun">', answer:"El Juicio Final, Catedral de Autun - Fe en Dios. Miedo y devoción."},
+        { value:300, prompt:"¿Qué sensación da la postura del David?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQid5jb5zZGAT-tgcYrJ2NwJDoyReDrifTdVw&s" alt="David">', answer:"David, Miguel Ángel -  y control."},
+        { value:400, prompt:"¿Qué transmite el color y la luz de esta pintura?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/La_Libert%C3%A9_guidant_le_peuple_-_Eug%C3%A8ne_Delacroix_-_Mus%C3%A9e_du_Louvre_Peintures_RF_129_-_apr%C3%A8s_restauration_2024.jpg/1200px-La_Libert%C3%A9_guidant_le_peuple_-_Eug%C3%A8ne_Delacroix_-_Mus%C3%A9e_du_Louvre_Peintures_RF_129_-_apr%C3%A8s_restauration_2024.jpg" alt="Delacroix">', answer:"Patriotismo/nacionalismo - Movimiento y energía heroica. - La Libertad guiando al pueblo, Delacroix"},
+        { value:500, prompt:"¿Qué emoción produce el claroscuro barroco?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqtE2dH6gA4YA5hfZY02j7OHTw0Ifc--xEcQ&s" alt="Caravaggio">', answer:"Emociones fuertes - Fe Católica - Dramatismo y tensión. - Cena en Emaús – Caravaggio"},
+        { value:600, prompt:"¿Qué expresa el trazo de Basquiat?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQHsAIj3yLKjv1lyeSbkrDyRrjZHYcHrJkmvQ&s" alt="Basquiat">', answer:"Rebeldía y energía urbana. - Sin título, Basquiat"},
+        { value:700, prompt:"¿Qué sensación genera estar dentro de la obra de Kusama?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://mag.rochester.edu/wp-content/uploads/2023/05/mirrored-infinity-room-kusama.jpg" alt="Infinity Mirror Room">', answer:"Inmensidad y pérdida de límites - Infinity Mirror Room."}
+      ]
+    },
+    {
+      name: "Detalles curiosos",
+      questions: [
+        { value:100, prompt:"¿Con qué material pintaban en la prehistoria?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://i.pinimg.com/736x/e0/ba/9a/e0ba9acc576e52706c383e70a7493993.jpg" alt="Pigmentos">', answer:"Pigmentos minerales y vegetales. - Cuevas de Castellón"},
+        { value:200, prompt:"¿Por qué usaban oro en los sarcófagos?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://content-historia.nationalgeographic.com.es/medio/2023/11/29/tut-mask_e1a0329a_231129120904_550x807.jpg" alt="Máscara de Tutankamón">', answer:"Asociado al sol y la eternidad. - Máscara de Tutankamón"},
+        { value:300, prompt:"¿Qué innovación técnica usaron los romanos en la arquitectura?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://www.archeoroma.es/wp-content/uploads/2016/10/coliseo-roma.jpg" alt="Coliseo">', answer:"Arcos y hormigón. - Coliseo Romano"},
+        { value:400, prompt:"¿Qué desarrollo ayudó a los artistas renacentistas a medir proporciones?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://i0.wp.com/hortushesperidum.com/wp-content/uploads/2016/03/entrega_de_las_llaves_a_san_pedro_perugino.jpg?fit=1200%2C724&ssl=1" alt="Perugino">', answer:"Perspectiva - Caja estenopeica - Regla y Cuadrícula - Los esposales de la Virgen María"},
+        { value:500, prompt:"¿Por qué los impresionistas pintaban al aire libre?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTKYjouk2hjho83bw3wL_koOkkqceCIAj8YEA&s" alt="Renoir/Monet">', answer:"Para captar la luz real. - Monet, Catedral de Rouen"},
+        { value:600, prompt:"¿Qué técnica usó este artista para lograr texturas reales en su pintura?.", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://historia-arte.com/_/eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpbSI6WyJcL2FydHdvcmtcL2ltYWdlRmlsZVwvNjA4MGIxNGVjZTQ3Ni5qcGciLCJyZXNpemUsMjAwMCwyMDAwIl19.IZI19bU_fg7TylrA3Le4CLcvcajDlyuKkeE1YO4zKWg.jpg" alt="Van Gogh">', answer:"Pinceladas gruesas en relieve (impasto).  Los girasoles, Vincent van Gogh"},
+        { value:700, prompt:"¿Qué innovación técnica permitió construir esta torre?", media:'<img class="max-h-[55vh] mx-auto rounded-xl object-contain" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Eiffelturm.JPG/330px-Eiffelturm.JPG" alt="Torre Eiffel">', answer:"Uso del hierro como estructura principal, propio de la ingeniería moderna. - Torre Eiffel, Gustave Eiffel"}
+      ]
+    }
+  ];
+
+  // ============================
+  //   ESTADO / UTILIDADES
+  // ============================
+  const state = {
+    current: null,
+    played: new Set(),
+    scores: Array.from({length:8}, ()=>0),
+    teamNames: Array.from({length:8}, (_,i)=>`Equipo ${i+1}`),
+    history: [],
+    timer: { duration: 30, remaining: 30, running: false, interval: null },
+    soundOn: true,
+    autoBack: true, // retorno automático al tablero al marcar jugada
+  };
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  // ============================
+  //   AUDIO
+  // ============================
+  let audioCtx = null;
+  function ensureAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+  function playBeep(freq=740, dur=0.25, vol=0.15) {
+    if (!state.soundOn) return;
+    ensureAudio();
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination); o.start(); setTimeout(()=>o.stop(), dur*1000);
+  }
+  function playSwoosh() {
+    if (!state.soundOn) return;
+    ensureAudio();
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    const lfo = audioCtx.createOscillator(); const lfoGain = audioCtx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(400, audioCtx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.35);
+    g.gain.value = 0.08; lfo.frequency.value = 12; lfoGain.gain.value = 40;
+    lfo.connect(lfoGain); lfoGain.connect(o.frequency); o.connect(g); g.connect(audioCtx.destination);
+    o.start(); lfo.start(); setTimeout(()=>{ o.stop(); lfo.stop(); }, 350);
+  }
+
+  // ============================
+  //   TABLERO
+  // ============================
+  const boardEl = $('#board');
+  function renderBoard() {
+    boardEl.innerHTML = '';
+    // Encabezados
+    for (let c=0;c<GAME_DATA.length;c++){
+      const head = document.createElement('div');
+      head.className = "col-span-1 text-center px-2 py-3 md:py-4 rounded-xl font-extrabold bg-gradient-to-tr from-yellowY/30 via-magentaM/30 to-cyanC/30 border border-white/15";
+      head.textContent = GAME_DATA[c].name;
+      boardEl.appendChild(head);
+    }
+    // Filas según longitud máxima
+    const rows = Math.max(...GAME_DATA.map(cat=>cat.questions.length));
+    for (let r=0;r<rows;r++){
+      for (let c=0;c<GAME_DATA.length;c++){
+        const q = GAME_DATA[c].questions[r];
+        const id = `${c}-${r}`;
+        const btn = document.createElement('button');
+        btn.className = "relative group w-full aspect-[5/3] text-3xl md:text-4xl font-extrabold rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 hover:border-cyanC/60 hover:from-slate-700 hover:to-slate-900 transition overflow-hidden";
+        btn.innerHTML = `
+          <span class="absolute inset-0 opacity-0 group-hover:opacity-100 transition pulse-ring"></span>
+          <div class="absolute inset-0 bg-[radial-gradient(800px_200px_at_50%_-10%,rgba(250,204,21,.18),transparent_60%)]"></div>
+          <div class="absolute bottom-2 right-3 text-xs px-2 py-0.5 rounded bg-white/10 border border-white/10 opacity-80">${GAME_DATA[c].name.split(' ')[0]}</div>
+          <span class="relative">${q?.value ?? ''}</span>
+        `;
+        btn.disabled = !q;
+        if (q){
+          btn.addEventListener('click', ()=>{
+            state.current = {catIndex: c, qIndex: r};
+            updateCurrentCellInfo(); openOverlayPrep(); playSwoosh();
+          });
+        }
+        if (state.played.has(id)) btn.classList.add('played');
+        boardEl.appendChild(btn);
+      }
+    }
+  }
+  function updateCurrentCellInfo(){
+    const info = $('#currentCellInfo');
+    if(!state.current){ info.textContent = "Seleccione una celda del tablero para preparar la pregunta."; return; }
+    const {catIndex,qIndex} = state.current;
+    const cat = GAME_DATA[catIndex].name;
+    const val = GAME_DATA[catIndex].questions[qIndex].value;
+    info.textContent = `Seleccionado: "${cat}" — ${val} puntos. Puede mostrar pregunta/respuesta, controlar el temporizador y marcar como jugada.`;
+  }
+
+  // ============================
+  //   OVERLAY
+  // ============================
+  const overlay = $('#overlay');
+  const overlayContent = $('#overlayContent');
+  const overlayMeta = $('#overlayMeta');
+  const overlayTimerBadge = $('#overlayTimerBadge');
+  let overlayMode = 'hidden'; // 'prep'|'prompt'|'answer'
+
+  function openOverlayPrep(){
+    overlay.classList.remove('hidden'); overlayMode = 'prep';
+    renderOverlay(); mirrorTimerToOverlay();
+  }
+  function closeOverlay(){ overlay.classList.add('hidden'); overlayMode = 'hidden'; }
+  function renderOverlay(){
+    if(!state.current) return;
+    const {catIndex,qIndex} = state.current;
+    const q = GAME_DATA[catIndex].questions[qIndex];
+    overlayMeta.textContent = `${GAME_DATA[catIndex].name} • ${q.value} puntos`;
+    let inner = '';
+    if (overlayMode==='prep'){
+      inner = `
+        <div class="h-full flex flex-col items-center justify-center text-center">
+          <p class="text-sm opacity-80 mb-2">Pregunta preparada</p>
+          <h3 class="text-2xl md:text-3xl font-bold mb-6">Lista para mostrar</h3>
+          <p class="opacity-80 max-w-3xl">Use <span class="px-2 py-1 rounded bg-white/10">Mostrar pregunta</span>. Inicie el temporizador cuando corresponda.</p>
+        </div>`;
+    }
+    if (overlayMode==='prompt'){
+      inner = `
+        <div class="prose prose-invert max-w-none">
+          ${q.media ? `<div class="mb-6">${q.media}</div>`:''}
+          <h3 class="text-2xl md:text-3xl font-bold">Pregunta</h3>
+          <p class="text-lg md:text-xl leading-relaxed mt-2">${q.prompt}</p>
+        </div>`;
+    }
+    if (overlayMode==='answer'){
+      inner = `
+        <div class="prose prose-invert max-w-none">
+          ${q.media ? `<div class="mb-6">${q.media}</div>`:''}
+          <h3 class="text-2xl md:text-3xl font-bold">Respuesta esperada</h3>
+          <p class="text-lg md:text-xl leading-relaxed mt-2">${q.answer}</p>
+        </div>`;
+    }
+    overlayContent.innerHTML = inner;
+    $('#overlayShowPrompt').disabled = (overlayMode==='prompt');
+    $('#overlayShowAnswer').disabled = (overlayMode==='answer');
+  }
+  $('#overlayBack').addEventListener('click', ()=>{ closeOverlay(); playSwoosh(); });
+  $('#overlayShowAnswer').addEventListener('click', ()=>{ overlayMode='answer'; renderOverlay(); playSwoosh(); });
+  $('#overlayShowPrompt').addEventListener('click', ()=>{ overlayMode='prompt'; renderOverlay(); playSwoosh(); });
+  $('#overlayMarkPlayed').addEventListener('click', markCurrentPlayed);
+  $('#overlayFocusTimer').addEventListener('click', ()=>{ overlayTimerBadge.classList.add('animate-pulse'); setTimeout(()=>overlayTimerBadge.classList.remove('animate-pulse'), 1500); });
+
+  // ============================
+  //   CONTROLES DOCENTE
+  // ============================
+  $('#btnShowPrompt').addEventListener('click', ()=>{
+    if(!state.current) return; if(overlay.classList.contains('hidden')) openOverlayPrep();
+    overlayMode='prompt'; renderOverlay(); playSwoosh();
+  });
+  $('#btnShowAnswer').addEventListener('click', ()=>{
+    if(!state.current) return; if(overlay.classList.contains('hidden')) openOverlayPrep();
+    overlayMode='answer'; renderOverlay(); playSwoosh();
+  });
+  $('#btnBackToBoard').addEventListener('click', ()=>{ closeOverlay(); playSwoosh(); });
+  $('#btnMarkPlayed').addEventListener('click', markCurrentPlayed);
+
+  function markCurrentPlayed(){
+    if(!state.current) return;
+    const {catIndex,qIndex} = state.current;
+    const id = `${catIndex}-${qIndex}`;
+    state.played.add(id);
+    renderBoard();
+    playBeep(520,.12,.12);
+    if (state.autoBack) closeOverlay();
+  }
+
+  // ============================
+  //   TEMPORIZADOR
+  // ============================
+  const timerDisplay = $('#timerDisplay');
+  const timerPreset = $('#timerPreset');
+  const timerStart = $('#timerStart');
+  const timerPause = $('#timerPause');
+  const timerReset = $('#timerReset');
+
+  function setTimerDuration(sec){
+    state.timer.duration = sec; state.timer.remaining = sec;
+    updateTimerDisplay(); mirrorTimerToOverlay();
+  }
+  function updateTimerDisplay(){
+    timerDisplay.textContent = state.timer.remaining.toString();
+    if (state.timer.remaining <= 5) timerDisplay.classList.add('text-magentaM');
+    else timerDisplay.classList.remove('text-magentaM');
+  }
+  function mirrorTimerToOverlay(){
+    overlayTimerBadge.textContent = state.timer.remaining.toString();
+    overlayTimerBadge.style.opacity = overlay.classList.contains('hidden') ? '0' : '1';
+  }
+  function tick(){
+    if (!state.timer.running) return;
+    if (state.timer.remaining > 0){
+      state.timer.remaining -= 1; updateTimerDisplay(); mirrorTimerToOverlay();
+      if (state.timer.remaining <= 5 && state.soundOn) playBeep(880, .08, .08);
+    } else {
+      stopTimer();
+      if (state.soundOn) { playBeep(220, .25, .18); setTimeout(()=>playBeep(180,.35,.20), 180); }
+      flashEnd();
+    }
+  }
+  function flashEnd(){
+    timerDisplay.classList.add('animate-bounce'); setTimeout(()=>timerDisplay.classList.remove('animate-bounce'), 1500);
+    if (!overlay.classList.contains('hidden')){ overlayContent.classList.add('animate-pulse'); setTimeout(()=>overlayContent.classList.remove('animate-pulse'), 1200); }
+  }
+  function startTimer(){ if (state.timer.running) return; state.timer.running = true; state.timer.interval = setInterval(tick, 1000); }
+  function stopTimer(){ state.timer.running = false; clearInterval(state.timer.interval); state.timer.interval = null; }
+  function resetTimer(){ stopTimer(); state.timer.remaining = state.timer.duration; updateTimerDisplay(); mirrorTimerToOverlay(); }
+
+  timerStart.addEventListener('click', startTimer);
+  timerPause.addEventListener('click', stopTimer);
+  timerReset.addEventListener('click', resetTimer);
+  timerPreset.addEventListener('change', (e)=> setTimerDuration(parseInt(e.target.value,10)));
+
+  // ============================
+  //   MARCADOR / HISTORIAL
+  // ============================
+  const teamsEl = $('#teams'); const historyEl = $('#history');
+
+  function renderTeams(){
+    teamsEl.innerHTML = '';
+    state.scores.forEach((score, i)=>{
+      const card = document.createElement('div');
+      card.className = "relative isolate overflow-hidden rounded-xl border border-white/10 bg-white/[.03] p-3 shadow-soft space-y-3";
+      card.innerHTML = `
+        <div class="flex items-center gap-2">
+          <input data-team="${i}" class="team-name flex-1 bg-transparent border border-white/15 focus:border-cyanC/50 rounded-lg px-2 py-1 text-sm" value="${state.teamNames[i]}">
+          <!-- Puntaje más chico (solo tipografía) -->
+          <span class="text-sm font-extrabold tabular-nums">${score}</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <input data-amt="${i}" type="number" class="adj-amt relative z-10 w-full bg-transparent border border-white/15 rounded-lg px-2 py-1 text-sm" placeholder="+/- puntos" />
+          <div class="hidden md:flex items-center justify-center text-xs opacity-60">o</div>
+          <select data-quick="${i}" class="quick relative z-10 w-full bg-transparent border border-white/15 rounded-lg px-2 py-1 text-sm">
+            <option value="">Rápido</option>
+            <option value="100">+100</option><option value="-100">−100</option>
+            <option value="200">+200</option><option value="-200">−200</option>
+            <option value="300">+300</option><option value="-300">−300</option>
+            <option value="400">+400</option><option value="-400">−400</option>
+            <option value="500">+500</option><option value="-500">−500</option>
+            <option value="600">+600</option><option value="-600">−600</option>
+            <option value="700">+700</option><option value="-700">−700</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button data-plus="${i}" class="px-2 py-2 rounded-lg bg-cyanC/90 hover:bg-cyanC text-slate-900 font-semibold">+ Sumar</button>
+          <button data-minus="${i}" class="px-2 py-2 rounded-lg bg-white/10 hover:bg-white/20">− Restar</button>
+        </div>
+      `;
+      teamsEl.appendChild(card);
+    });
+
+    // Listeners
+    $$('.team-name', teamsEl).forEach(input=>{
+      input.addEventListener('change', (e)=>{
+        const idx = parseInt(e.target.dataset.team,10);
+        state.teamNames[idx] = e.target.value || `Equipo ${idx+1}`;
+      });
+    });
+    $$('.quick', teamsEl).forEach(sel=>{
+      sel.addEventListener('change', (e)=>{
+        const idx = parseInt(e.target.dataset.quick,10);
+        const val = parseInt(e.target.value||'0',10);
+        if (val !== 0) adjustScore(idx, val, `(rápido ${val>0?'+':''}${val})`);
+        e.target.value = '';
+      });
+    });
+    $$('[data-plus]', teamsEl).forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const idx = parseInt(e.target.dataset.plus,10);
+        const amtInput = teamsEl.querySelector(`[data-amt="${idx}"]`);
+        const val = parseInt(amtInput.value||'0',10) || inferCurrentCellValue();
+        adjustScore(idx, Math.abs(val), `+${Math.abs(val)}`);
+        amtInput.value='';
+      });
+    });
+    $$('[data-minus]', teamsEl).forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const idx = parseInt(e.target.dataset.minus,10);
+        const amtInput = teamsEl.querySelector(`[data-amt="${idx}"]`);
+        const val = parseInt(amtInput.value||'0',10) || inferCurrentCellValue();
+        adjustScore(idx, -Math.abs(val), `−${Math.abs(val)}`);
+        amtInput.value='';
+      });
+    });
+  }
+
+  function inferCurrentCellValue(){
+    if (!state.current) return 100;
+    const {catIndex, qIndex} = state.current;
+    return GAME_DATA[catIndex].questions[qIndex].value || 100;
+  }
+
+  function adjustScore(teamIdx, delta, note=''){
+    state.scores[teamIdx] += delta;
+    renderTeams();
+    renderLargeScoreboard();   // mantiene sincronizado el marcador grande
+    const stamp = new Date();
+    const time = stamp.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const cell = state.current ? `${GAME_DATA[state.current.catIndex].name} ${GAME_DATA[state.current.catIndex].questions[state.current.qIndex].value}` : '—';
+    const entry = { time, team: state.teamNames[teamIdx], delta, after: state.scores[teamIdx], cell, note };
+    state.history.unshift(entry);
+    renderHistory();
+    playBeep(delta>=0 ? 660 : 330, 0.09, 0.12);
+  }
+
+  function renderHistory(){
+    historyEl.innerHTML = '';
+    if (state.history.length===0){ historyEl.innerHTML = `<div class="text-xs opacity-70">Sin movimientos todavía.</div>`; return; }
+    state.history.forEach(h=>{
+      const row = document.createElement('div');
+      row.className = "flex items-center justify-between gap-3 bg-white/[.03] border border-white/10 rounded-lg px-3 py-2";
+      row.innerHTML = `
+        <div class="text-xs opacity-70">${h.time}</div>
+        <div class="flex-1 text-sm truncate">
+          <span class="opacity-80">${h.team}</span>
+          <span class="opacity-50">•</span>
+          <span class="opacity-80">${h.cell}</span>
+          ${h.note ? `<span class="ml-1 opacity-60">(${h.note})</span>`:''}
+        </div>
+        <div class="font-bold ${h.delta>=0?'text-cyanC':'text-magentaM'}">${h.delta>=0?'+':''}${h.delta}</div>
+        <div class="text-xs opacity-70">=${h.after}</div>
+      `;
+      historyEl.appendChild(row);
+    });
+  }
+
+  // Reset y limpiar historial
+  $('#resetScores').addEventListener('click', ()=>{
+    state.scores = state.scores.map(()=>0); renderTeams(); renderLargeScoreboard(); playBeep(500,.12,.12);
+  });
+  $('#clearHistory').addEventListener('click', ()=>{ state.history = []; renderHistory(); });
+
+  // ============================
+  //   MARCADOR GRANDE (debajo del tablero)
+  // ============================
+  const scoreboardGrid = document.getElementById('scoreboardGrid');
+  function renderLargeScoreboard() {
+    if (!scoreboardGrid) return;
+    scoreboardGrid.innerHTML = '';
+    state.teamNames.forEach((name, i) => {
+      const score = state.scores[i];
+      const card = document.createElement('div');
+      card.className = "rounded-xl border border-white/10 bg-white/[.03] p-3 flex flex-col items-center justify-center";
+      card.innerHTML = `
+        <div class="text-xs opacity-70 mb-1">${name}</div>
+        <div class="text-3xl md:text-4xl font-extrabold tabular-nums tracking-tight text-yellowY">${score}</div>
+      `;
+      scoreboardGrid.appendChild(card);
+    });
+  }
+
+  // ============================
+  //   RESULTADOS FINALES
+  // ============================
+  const finalResults = document.getElementById('finalResults');
+  const finalResultsContent = document.getElementById('finalResultsContent');
+  const showFinalResultsBtn = document.getElementById('showFinalResultsBtn');
+  const closeFinalResults = document.getElementById('closeFinalResults');
+
+  function openFinalResults(){
+    // Generar ranking
+    const ranking = state.teamNames.map((n, i) => ({ name: n, score: state.scores[i] }))
+                                  .sort((a,b)=> b.score - a.score);
+
+    // Podio + tabla completa
+    const podium = ranking.slice(0,3);
+
+    finalResultsContent.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        ${podium.map((p, idx)=>`
+          <div class="rounded-xl border border-white/10 p-4 text-center ${idx===0?'bg-yellowY/10':'bg-white/[.03]'}">
+            <div class="text-sm opacity-70">${idx===0?'1º':idx===1?'2º':'3º'}</div>
+            <div class="text-lg font-semibold">${p.name}</div>
+            <div class="text-3xl font-extrabold tabular-nums text-yellowY mt-1">${p.score}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="mt-4">
+        <h4 class="text-sm font-bold opacity-80 mb-2">Tabla completa</h4>
+        <div class="overflow-hidden rounded-xl border border-white/10">
+          <table class="w-full text-sm">
+            <thead class="bg-white/5">
+              <tr>
+                <th class="text-left px-3 py-2">#</th>
+                <th class="text-left px-3 py-2">Equipo</th>
+                <th class="text-right px-3 py-2">Puntos</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ranking.map((r, i)=>`
+                <tr class="${i%2?'bg-white/[.02]':''}">
+                  <td class="px-3 py-2">${i+1}</td>
+                  <td class="px-3 py-2">${r.name}</td>
+                  <td class="px-3 py-2 text-right font-bold tabular-nums">${r.score}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    finalResults.classList.remove('hidden');
+  }
+
+  if (showFinalResultsBtn) showFinalResultsBtn.addEventListener('click', openFinalResults);
+  if (closeFinalResults) closeFinalResults.addEventListener('click', ()=> finalResults.classList.add('hidden'));
+
+  // ============================
+  //   INIT
+  // ============================
+  function init(){
+    renderBoard();
+    renderTeams();
+    renderLargeScoreboard();
+    renderHistory();
+    setTimerDuration(30);
+    updateCurrentCellInfo();
+    setTimeout(()=>$('#instructions').classList.remove('hidden'), 400);
+  }
+  $('#toggleInstructionsBtn').addEventListener('click', ()=> $('#instructions').classList.remove('hidden'));
+  $('#closeInstructions').addEventListener('click', ()=> $('#instructions').classList.add('hidden'));
+  $('#soundToggle').addEventListener('change', (e)=> state.soundOn = e.target.checked );
+  const autoBackToggle = document.getElementById('autoBackToggle');
+  if (autoBackToggle) autoBackToggle.addEventListener('change', (e)=> { state.autoBack = e.target.checked; });
+
+  // Reiniciar partida
+  $('#newGameBtn').addEventListener('click', ()=>{
+    state.played.clear(); state.current = null;
+    state.scores = state.scores.map(()=>0); state.history = [];
+    stopTimer(); setTimerDuration(parseInt($('#timerPreset').value,10) || 30);
+    renderBoard(); renderTeams(); renderLargeScoreboard(); renderHistory(); updateCurrentCellInfo(); playSwoosh();
+  });
+
+  init();
+  </script>
+
+  <!-- Resultados finales (modal) -->
+  <section id="finalResults" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/75"></div>
+    <div class="relative z-10 max-w-3xl mx-auto mt-10 mb-6 bg-slate-900 border border-white/10 rounded-2xl p-6 md:p-8 shadow-soft">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-cyanC/20 flex items-center justify-center">🏆</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-extrabold mb-2">Resultados finales</h3>
+          <div id="finalResultsContent" class="space-y-4"></div>
+        </div>
+        <button id="closeFinalResults" class="ml-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20">Cerrar</button>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
