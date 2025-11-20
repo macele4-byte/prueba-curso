@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Indicadores de Desempeño Escolar en el Ciclo Orientado</title>
+
+  <!-- Chart.js base para el gráfico de barras -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Google Charts para boxplot (candlestick) y sankey -->
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+  <style>
+    /* Fondo general con gradiente violeta/rosa */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(135deg, #2c1240, #4b1f60, #7a2f7f, #d5489d);
+      color: #f7f3fb;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 20px auto 40px auto;
+      padding: 20px 24px 32px;
+      background: rgba(15, 5, 30, 0.9);
+      border-radius: 18px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 6px;
+    }
+
+    .subtitulo {
+      font-size: 0.95rem;
+      opacity: 0.85;
+      margin-bottom: 20px;
+    }
+
+    .filtros {
+      margin: 10px 0 20px;
+    }
+
+    label {
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    select {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #b57ad2;
+      background: #2c1240;
+      color: #f7f3fb;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: #f06292;
+      box-shadow: 0 0 0 2px rgba(240, 98, 146, 0.4);
+    }
+
+    /* Tarjetas KPI */
+    .kpi-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 18px 0 24px;
+    }
+
+    .kpi-card {
+      background: linear-gradient(135deg, #45215d, #8e24aa);
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .kpi-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.85;
+    }
+
+    .kpi-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .kpi-detail {
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    .kpi-badge {
+      align-self: flex-start;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Secciones de gráficos */
+    .section {
+      margin-top: 28px;
+    }
+
+    .section h2 {
+      font-size: 1.3rem;
+      margin-bottom: 6px;
+    }
+
+    .section p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      margin-bottom: 14px;
+    }
+
+    .chart-wrapper {
+      background: rgba(23, 9, 45, 0.95);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    canvas {
+      max-width: 100%;
+      height: 320px;
+    }
+
+    /* Contenedores para Google Charts */
+    #boxplot_div,
+    #sankey_div {
+      width: 100%;
+      height: 320px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        margin: 10px;
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Título y descripción -->
+    <h1>Indicadores de Desempeño Escolar en el Ciclo Orientado</h1>
+    <div class="subtitulo">
+      Panel conceptual para analizar tasas de aprobación, distribución de rendimientos y trayectorias académicas en el ciclo orientado de nivel medio.
+    </div>
+
+    <!-- KPIs: alertas e indicadores críticos -->
+    <div class="kpi-container">
+      <div class="kpi-card">
+        <div class="kpi-label">Tasa de aprobación general</div>
+        <div class="kpi-value" id="kpi-aprobacion-general">84%</div>
+        <div class="kpi-detail">
+          Porcentaje estimado de estudiantes aprobados en el ciclo orientado.
+        </div>
+        <div class="kpi-badge">Indicador global</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Materia con menor aprobación</div>
+        <div class="kpi-value" id="kpi-materia-critica">Matemática (72%)</div>
+        <div class="kpi-detail">
+          Espacio curricular a priorizar en estrategias de refuerzo.
+        </div>
+        <div class="kpi-badge">Alerta focalizada</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Curso con más pendientes</div>
+        <div class="kpi-value" id="kpi-curso-pendientes">5.º año</div>
+        <div class="kpi-detail">
+          Mayor concentración de espacios pendientes de aprobación.
+        </div>
+        <div class="kpi-badge">Seguimiento específico</div>
+      </div>
+    </div>
+
+    <!-- Filtro principal -->
+    <div class="filtros">
+      <label for="cursoSelect">Seleccionar curso:</label>
+      <select id="cursoSelect">
+        <option value="4">4.º año</option>
+        <option value="5">5.º año</option>
+        <option value="6">6.º año</option>
+      </select>
+    </div>
+
+    <!-- Gráfico de barras por curso -->
+    <div class="section">
+      <h2>Aprobación por espacios curriculares</h2>
+      <p>
+        Porcentaje de estudiantes aprobados por materia en cada curso del ciclo orientado.
+      </p>
+      <div class="chart-wrapper">
+        <canvas id="aprobadosChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Boxplot: distribución de rendimiento por materia -->
+    <div class="section">
+      <h2>Distribución de calificaciones por materia</h2>
+      <p>
+        Representación de la dispersión de notas finales por espacio curricular (valores de ejemplo).
+      </p>
+      <div class="chart-wrapper">
+        <div id="boxplot_div"></div>
+      </div>
+    </div>
+
+    <!-- Sankey: trayectorias reales vs protegidas -->
+    <div class="section">
+      <h2>Trayectorias reales y trayectorias protegidas</h2>
+      <p>
+        Flujo simulado de estudiantes desde el ingreso al ciclo orientado hasta su situación al cierre, diferenciando
+        trayectorias reales y protegidas.
+      </p>
+      <div class="chart-wrapper">
+        <div id="sankey_div"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --------------------------------------------------------------------
+    // Gráfico de barras con Chart.js (igual que antes)
+    // --------------------------------------------------------------------
+    const datosPorCurso = {
+      "4": {
+        etiquetas: ["Lengua", "Matemática", "Lenguaje Audiovisual", "TIC", "Historia"],
+        valores: [82, 75, 90, 88, 80]
+      },
+      "5": {
+        etiquetas: ["Lengua", "Matemática", "Producción Audiovisual", "TIC", "Formación Ética"],
+        valores: [78, 70, 87, 85, 83]
+      },
+      "6": {
+        etiquetas: ["Lengua", "Matemática", "Gestión de Proyectos", "Lenguaje Audiovisual", "Ciudadanía"],
+        valores: [85, 72, 92, 89, 88]
+      }
+    };
+
+    const colorBarra = "rgba(236, 64, 122, 0.8)";
+    const colorBarraBorde = "rgba(244, 143, 177, 1)";
+
+    const ctxBar = document.getElementById("aprobadosChart").getContext("2d");
+    const cursoInicial = "4";
+
+    const configBarras = {
+      type: "bar",
+      data: {
+        labels: datosPorCurso[cursoInicial].etiquetas,
+        datasets: [{
+          label: "% de estudiantes aprobados",
+          data: datosPorCurso[cursoInicial].valores,
+          backgroundColor: colorBarra,
+          borderColor: colorBarraBorde,
+          borderWidth: 1.5,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            labels: {
+              color: "#f7f3fb"
+            }
+          },
+          tooltip: {
+            enabled: true
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              color: "#f7f3fb"
+            },
+            title: {
+              display: true,
+              text: "Porcentaje de aprobación (%)",
+              color: "#f7f3fb"
+            },
+            grid: {
+              color: "rgba(255, 255, 255, 0.1)"
+            }
+          },
+          x: {
+            ticks: {
+              color: "#f7f3fb"
+            },
+            title: {
+              display: true,
+              text: "Espacios curriculares",
+              color: "#f7f3fb"
+            },
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    };
+
+    let aprobadosChart = new Chart(ctxBar, configBarras);
+
+    function actualizarGraficoBarras(cursoSeleccionado) {
+      const datos = datosPorCurso[cursoSeleccionado];
+      aprobadosChart.data.labels = datos.etiquetas;
+      aprobadosChart.data.datasets[0].data = datos.valores;
+      aprobadosChart.update();
+    }
+
+    const selectorCurso = document.getElementById("cursoSelect");
+    selectorCurso.addEventListener("change", function () {
+      const cursoSeleccionado = this.value;
+      actualizarGraficoBarras(cursoSeleccionado);
+    });
+
+    actualizarGraficoBarras(cursoInicial);
+
+    // --------------------------------------------------------------------
+    // Google Charts: boxplot (usando Candlestick) y Sankey
+    // --------------------------------------------------------------------
+    google.charts.load('current', {packages: ['corechart', 'sankey']});
+    google.charts.setOnLoadCallback(drawAllCharts);
+
+    function drawAllCharts() {
+      drawBoxplot();
+      drawSankey();
+    }
+
+    // Redibujar al cambiar tamaño de ventana (para que se mantenga responsive)
+    window.addEventListener('resize', drawAllCharts);
+
+    function drawBoxplot() {
+      // Datos de ejemplo: materia, min, q1, q3, max
+      // En Google Candlestick: low, open, close, high = min, q1, q3, max
+      const data = new google.visualization.DataTable();
+      data.addColumn('string', 'Materia');
+      data.addColumn('number', 'Mínimo');
+      data.addColumn('number', 'Q1');
+      data.addColumn('number', 'Q3');
+      data.addColumn('number', 'Máximo');
+
+      data.addRows([
+        ['Lengua',              4, 6,   8, 10],
+        ['Matemática',          3, 5,   7,  9],
+        ['Leng. Audiovisual',   5, 7,   9, 10],
+        ['TIC',                 4, 6.5, 8.5, 10],
+        ['Historia',            4, 6,   8,  9.5]
+      ]);
+
+      const options = {
+        legend: 'none',
+        backgroundColor: 'transparent',
+        candlestick: {
+          fallingColor: { strokeWidth: 1, stroke: '#f48fb1', fill: '#ec407a' },
+          risingColor:  { strokeWidth: 1, stroke: '#f48fb1', fill: '#ec407a' }
+        },
+        hAxis: {
+          textStyle: { color: '#f7f3fb' }
+        },
+        vAxis: {
+          title: 'Calificación (0–10)',
+          titleTextStyle: { color: '#f7f3fb' },
+          textStyle: { color: '#f7f3fb' },
+          gridlines: { color: 'rgba(255,255,255,0.1)' }
+        }
+      };
+
+      const chart = new google.visualization.CandlestickChart(document.getElementById('boxplot_div'));
+      chart.draw(data, options);
+    }
+
+    function drawSankey() {
+      const data = new google.visualization.DataTable();
+      data.addColumn('string', 'From');
+      data.addColumn('string', 'To');
+      data.addColumn('number', 'Weight');
+
+      // Flujos de ejemplo
+      data.addRows([
+        ['Ingreso ciclo orientado', 'Trayectoria real',       60],
+        ['Ingreso ciclo orientado', 'Trayectoria protegida',  40],
+
+        ['Trayectoria real',       'Aprobado',   45],
+        ['Trayectoria real',       'Pendiente',  10],
+        ['Trayectoria real',       'Desaprobado', 5],
+
+        ['Trayectoria protegida',  'Aprobado',   25],
+        ['Trayectoria protegida',  'Pendiente',  10],
+        ['Trayectoria protegida',  'Desaprobado', 5]
+      ]);
+
+      const colors = ['#f48fb1', '#ce93d8', '#ba68c8', '#ff80ab', '#f06292', '#ab47bc'];
+
+      const options = {
+        backgroundColor: 'transparent',
+        sankey: {
+          link: { color: { fill: '#fce4ec', fillOpacity: 0.6 } },
+          node: {
+            colors: colors,
+            label: { color: '#f7f3fb', fontSize: 11 }
+          }
+        }
+      };
+
+      const chart = new google.visualization.Sankey(document.getElementById('sankey_div'));
+      chart.draw(data, options);
+    }
+  </script>
+</body>
+</html>
